@@ -131,6 +131,12 @@ func runCommand(name string, args ...string) error {
 			if sum.TotalFailed > 0 {
 				opts = append(opts, tui.WithOnlyFail())
 			} else {
+				if report {
+					if err = reportpkg.GenerateAndSaveReport(sum, reportPath, reportName); err != nil {
+						return fmt.Errorf("error save report output: %w", err)
+					}
+				}
+
 				fmt.Println(textpkg.FgGreen.Sprint("All tests passed!"))
 				fmt.Println(textpkg.FgGreen.Sprint(sum.TotalPackages, " tests total, ", sum.TotalPassed, " tests passed, ", sum.TotalFailed, " tests failed"))
 				return nil

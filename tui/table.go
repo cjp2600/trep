@@ -2,14 +2,12 @@ package tui
 
 import (
 	"fmt"
-	"os"
-	"regexp"
-	"strings"
-	"time"
-
 	parserpkg "github.com/cjp2600/trep/parser"
 	tablepkg "github.com/jedib0t/go-pretty/v6/table"
 	textpkg "github.com/jedib0t/go-pretty/v6/text"
+	"os"
+	"regexp"
+	"strings"
 )
 
 type renderOption struct {
@@ -106,7 +104,7 @@ func BuildTable(sum *parserpkg.Summary, opts ...RenderOptionFunc) tablepkg.Write
 	t := tablepkg.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 
-	rows := tablepkg.Row{"Name", "Status", "Time"}
+	rows := tablepkg.Row{"Name", "Status"}
 	if !options.ciMode {
 		rows = append(rows, "Output")
 	}
@@ -120,13 +118,6 @@ func BuildTable(sum *parserpkg.Summary, opts ...RenderOptionFunc) tablepkg.Write
 			}
 			if options.onlyPass != nil && *options.onlyPass && !test.IsPassed {
 				continue
-			}
-
-			var elapsedTime string
-			if test.ElapsedTime == 0 {
-				elapsedTime = "0.000s"
-			} else {
-				elapsedTime = fmt.Sprintf("%.3fs", float64(test.ElapsedTime)/float64(time.Second))
 			}
 
 			var output = strings.Join(test.Output, "\n")
@@ -146,7 +137,7 @@ func BuildTable(sum *parserpkg.Summary, opts ...RenderOptionFunc) tablepkg.Write
 			}
 
 			tRows := []tablepkg.Row{
-				{testName, getIsPassedStr(test.IsPassed, options.ReportColors()), elapsedTime},
+				{testName, getIsPassedStr(test.IsPassed, options.ReportColors())},
 			}
 
 			if !options.ciMode {
@@ -160,12 +151,6 @@ func BuildTable(sum *parserpkg.Summary, opts ...RenderOptionFunc) tablepkg.Write
 				}
 				if options.onlyPass != nil && *options.onlyPass && !s.IsPassed {
 					continue
-				}
-
-				if s.ElapsedTime == 0 {
-					elapsedTime = "0.000s"
-				} else {
-					elapsedTime = fmt.Sprintf("%.3fs", float64(s.ElapsedTime)/float64(time.Second))
 				}
 
 				var out = strings.Join(s.Output, "\n")
@@ -188,7 +173,7 @@ func BuildTable(sum *parserpkg.Summary, opts ...RenderOptionFunc) tablepkg.Write
 				isLast := s == test.Subtests[len(test.Subtests)-1]
 				var symbol = getSymbol(isLast, options.ReportColors())
 				sRows := []tablepkg.Row{
-					{symbol + tName, getIsPassedStr(s.IsPassed, options.ReportColors()), elapsedTime},
+					{symbol + tName, getIsPassedStr(s.IsPassed, options.ReportColors())},
 				}
 
 				if !options.ciMode {
