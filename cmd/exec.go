@@ -111,26 +111,9 @@ func runCommand(name string, args ...string) error {
 	}
 
 	stopCh := make(chan bool)
-	go func() {
-		if mode == "ci" {
-			fmt.Printf("Running tests in CI mode...\n")
-			return
-		}
-
-		loaderChars := `-\|/`
-		i := 0
-		for {
-			select {
-			case <-stopCh:
-				fmt.Printf("\r")
-				return
-			default:
-				fmt.Printf("\r%s Running tests... ", textpkg.FgCyan.Sprintf(string(loaderChars[i%len(loaderChars)])))
-				time.Sleep(100 * time.Millisecond)
-				i++
-			}
-		}
-	}()
+	{
+		loader(stopCh)
+	}
 
 	for scanner.Scan() {
 		ex.parser.Parse(scanner.Text())
@@ -169,4 +152,33 @@ func runCommand(name string, args ...string) error {
 	fmt.Println(textpkg.FgGreen.Sprint(sum.TotalPackages, " tests total, ", sum.TotalPassed, " tests passed, ", sum.TotalFailed, " tests failed"))
 	fmt.Println(textpkg.FgGreen.Sprint("All tests passed!"))
 	return nil
+}
+
+// loader displays a loader while the tests are running
+func loader(stopCh chan bool) {
+	go func() {
+		if mode == "ci" {
+			fmt.Printf("Running tests...")
+			for {
+				select {
+				case <-stopCh:
+					fmt.Printf("\r")
+				}
+			}
+		} else {
+			loaderChars := `-\|/`
+			i := 0
+			for {
+				select {
+				case <-stopCh:
+					fmt.Printf("\r")
+					return
+				default:
+					fmt.Printf("\r%s Running tests... ", textpkg.FgCyan.Sprintf(string(loaderChars[i%len(loaderChars)])))
+					time.Sleep(100 * time.Millisecond)
+					i++
+				}
+			}
+		}
+	}()
 }
