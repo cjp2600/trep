@@ -15,18 +15,18 @@ import (
 )
 
 // GenerateAndSaveReport generates a report and saves it to the given path
-func GenerateAndSaveReport(sum *parserpkg.Summary, reportPath string) error {
+func GenerateAndSaveReport(sum *parserpkg.Summary, reportPath string, reportName string) error {
 	html, err := captureStdout(func() {
 		tui.BuildTable(sum, tui.WithReportColors()).RenderHTML()
 	})
 	if err != nil {
 		return fmt.Errorf("error rendering html: %w", err)
 	}
-	return saveReport(html, reportPath)
+	return saveReport(html, reportPath, reportName)
 }
 
 // saveReport saves the report to the given path
-func saveReport(tableHTML string, path string) error {
+func saveReport(tableHTML string, path string, reportName string) error {
 	if err := os.MkdirAll(path, os.ModePerm); err != nil {
 		return fmt.Errorf("error creating directories: %w", err)
 	}
@@ -50,7 +50,14 @@ func saveReport(tableHTML string, path string) error {
 		return fmt.Errorf("error executing template: %w", err)
 	}
 
-	filename := fmt.Sprintf("%s/report_%s.html", path, timestamp) // Использование path здесь
+	var rep string
+	if reportName != "" {
+		rep = reportName
+	} else {
+		rep = "report_" + timestamp
+	}
+
+	filename := fmt.Sprintf("%s/%s.html", path, rep) // Использование path здесь
 
 	if err := ioutil.WriteFile(filename, buf.Bytes(), 0644); err != nil {
 		return fmt.Errorf("error writing to file: %w", err)
