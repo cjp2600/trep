@@ -16,6 +16,7 @@ type renderOption struct {
 	onlyFail     *bool
 	onlyPass     *bool
 	reportColors *bool
+	ciMode       bool
 }
 
 func (r renderOption) ReportColors() bool {
@@ -23,6 +24,12 @@ func (r renderOption) ReportColors() bool {
 		return false
 	}
 	return *r.reportColors
+}
+
+func WithEnableCIMode(ciMode bool) RenderOptionFunc {
+	return func(opt *renderOption) {
+		opt.ciMode = ciMode
+	}
 }
 
 type RenderOptionFunc func(*renderOption)
@@ -98,7 +105,13 @@ func BuildTable(sum *parserpkg.Summary, opts ...RenderOptionFunc) tablepkg.Write
 
 	t := tablepkg.NewWriter()
 	t.SetOutputMirror(os.Stdout)
-	t.AppendHeader(tablepkg.Row{"Name", "Status", "Time", "Output"})
+
+	rows := tablepkg.Row{"Name", "Status", "Time"}
+	if !options.ciMode {
+		rows = append(rows, "Output")
+	}
+
+	t.AppendHeader(rows)
 
 	for _, tr := range sum.PackageResults {
 		for _, test := range tr.TestResults {
@@ -132,9 +145,14 @@ func BuildTable(sum *parserpkg.Summary, opts ...RenderOptionFunc) tablepkg.Write
 				testName = color(testName, textpkg.FgRed, options.ReportColors(), isBold)
 			}
 
-			t.AppendRows([]tablepkg.Row{
-				{testName, getIsPassedStr(test.IsPassed, options.ReportColors()), elapsedTime, output},
-			})
+			tRows := []tablepkg.Row{
+				{testName, getIsPassedStr(test.IsPassed, options.ReportColors()), elapsedTime},
+			}
+
+			if !options.ciMode {
+				tRows[0] = append(tRows[0], output)
+			}
+			t.AppendRows(tRows)
 
 			for _, s := range test.Subtests {
 				if options.onlyFail != nil && *options.onlyFail && s.IsPassed {
@@ -169,10 +187,14 @@ func BuildTable(sum *parserpkg.Summary, opts ...RenderOptionFunc) tablepkg.Write
 				// Добавим отступ к имени Subtest для его выделения
 				isLast := s == test.Subtests[len(test.Subtests)-1]
 				var symbol = getSymbol(isLast, options.ReportColors())
+				sRows := []tablepkg.Row{
+					{symbol + tName, getIsPassedStr(s.IsPassed, options.ReportColors()), elapsedTime},
+				}
 
-				t.AppendRows([]tablepkg.Row{
-					{symbol + tName, getIsPassedStr(s.IsPassed, options.ReportColors()), elapsedTime, out},
-				})
+				if !options.ciMode {
+					sRows[0] = append(sRows[0], out)
+				}
+				t.AppendRows(sRows)
 			}
 			t.AppendSeparator()
 		}

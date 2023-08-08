@@ -136,6 +136,9 @@ func runCommand(name string, args ...string) error {
 				return nil
 			}
 		}
+		if mode == "ci" {
+			opts = append(opts, tui.WithEnableCIMode(true))
+		}
 
 		tui.BuildTable(sum, opts...).Render()
 	}
