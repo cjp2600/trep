@@ -28,12 +28,14 @@ var onlyFail bool
 var report bool
 var reportPath string
 var mode string
+var reportName string
 
 func init() {
 	ExecCmd.Flags().BoolVarP(&onlyFail, "only-fail", "f", false, "Only display failed tests")
 	ExecCmd.Flags().BoolVarP(&report, "report", "r", false, "Generate a report")
 	ExecCmd.Flags().StringVarP(&reportPath, "report-path", "p", "./", "Path to save the report (default is current directory)")
-	ExecCmd.Flags().StringVarP(&mode, "mode", "m", "cli", "run mode (e.g. 'cli', 'ci')")
+	ExecCmd.Flags().StringVarP(&mode, "mode", "m", "cli", "Run mode (e.g. 'cli', 'ci')")
+	ExecCmd.Flags().StringVarP(&reportName, "report-name", "n", "", "Custom report name Example: report") // Новый флаг
 }
 
 type Exec struct {
@@ -139,7 +141,7 @@ func runCommand(name string, args ...string) error {
 	}
 
 	if report {
-		if err = reportpkg.GenerateAndSaveReport(sum, reportPath); err != nil {
+		if err = reportpkg.GenerateAndSaveReport(sum, reportPath, reportName); err != nil {
 			return fmt.Errorf("error save report output: %w", err)
 		}
 	}
