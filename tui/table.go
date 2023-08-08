@@ -13,8 +13,16 @@ import (
 )
 
 type renderOption struct {
-	onlyFail *bool
-	onlyPass *bool
+	onlyFail     *bool
+	onlyPass     *bool
+	reportColors *bool
+}
+
+func (r renderOption) ReportColors() bool {
+	if r.reportColors == nil {
+		return false
+	}
+	return *r.reportColors
 }
 
 type RenderOptionFunc func(*renderOption)
@@ -26,6 +34,13 @@ func WithOnlyFail() RenderOptionFunc {
 	}
 }
 
+func WithReportColors() RenderOptionFunc {
+	return func(opt *renderOption) {
+		b := true
+		opt.reportColors = &b
+	}
+}
+
 func WithOnlyPass() RenderOptionFunc {
 	return func(opt *renderOption) {
 		b := true
@@ -33,7 +48,49 @@ func WithOnlyPass() RenderOptionFunc {
 	}
 }
 
-func Render(sum *parserpkg.Summary, opts ...RenderOptionFunc) {
+// color returns the colored output if reportColors is true, else returns the
+func color(output string, color textpkg.Color, opts ...bool) string {
+	var isReportColors = len(opts) > 0 && opts[0]
+	var isBold = len(opts) > 1 && opts[1]
+
+	if !isReportColors {
+		if isBold {
+			return textpkg.Bold.Sprintf(color.Sprintf(output))
+		}
+		return color.Sprintf(output)
+	}
+
+	if isBold {
+		return fmt.Sprintf("<span %s><b>%s</b></span>", color.HTMLProperty(), output)
+	}
+	return fmt.Sprintf("<span %s>%s</span>", color.HTMLProperty(), output)
+}
+
+func getIsPassedStr(isPassed bool, reportColors bool) string {
+	var passedStr string
+	if isPassed {
+		passedStr = color("✓ pass", textpkg.FgGreen, reportColors)
+	} else {
+		passedStr = color("× fail", textpkg.FgRed, reportColors)
+	}
+
+	return passedStr
+}
+
+func getSymbol(isLast bool, reportColors bool) string {
+	var symbol = " ├─ "
+	if isLast {
+		symbol = " ╰─ "
+	}
+
+	if reportColors {
+		symbol = "&nbsp;&nbsp;&nbsp;&nbsp;"
+	}
+
+	return symbol
+}
+
+func BuildTable(sum *parserpkg.Summary, opts ...RenderOptionFunc) tablepkg.Writer {
 	options := &renderOption{}
 	for _, o := range opts {
 		o(options)
@@ -44,20 +101,12 @@ func Render(sum *parserpkg.Summary, opts ...RenderOptionFunc) {
 	t.AppendHeader(tablepkg.Row{"Name", "Status", "Time", "Output"})
 
 	for _, tr := range sum.PackageResults {
-		//table.Title = t.PackageName
 		for _, test := range tr.TestResults {
 			if options.onlyFail != nil && *options.onlyFail && test.IsPassed {
 				continue
 			}
 			if options.onlyPass != nil && *options.onlyPass && !test.IsPassed {
 				continue
-			}
-
-			var isPassed string
-			if test.IsPassed {
-				isPassed = textpkg.FgGreen.Sprintf("✓ pass")
-			} else {
-				isPassed = textpkg.FgRed.Sprintf("× fail")
 			}
 
 			var elapsedTime string
@@ -72,18 +121,19 @@ func Render(sum *parserpkg.Summary, opts ...RenderOptionFunc) {
 			if len(output) > 0 && output[len(output)-1] == '\n' {
 				output = output[:len(output)-1]
 			}
-			output, _ = extractError(output)
+			output, _ = extractErrorOrPanic(output)
 
 			var testName = test.TestName
+			var isBold = len(test.Subtests) > 0
 			if test.IsPassed {
-				testName = textpkg.FgGreen.Sprintf(testName)
+				testName = color(testName, textpkg.FgGreen, options.ReportColors(), isBold)
 				output = ""
 			} else {
-				testName = textpkg.FgRed.Sprintf(testName)
+				testName = color(testName, textpkg.FgRed, options.ReportColors(), isBold)
 			}
 
 			t.AppendRows([]tablepkg.Row{
-				{testName, isPassed, elapsedTime, output},
+				{testName, getIsPassedStr(test.IsPassed, options.ReportColors()), elapsedTime, output},
 			})
 
 			for _, s := range test.Subtests {
@@ -92,12 +142,6 @@ func Render(sum *parserpkg.Summary, opts ...RenderOptionFunc) {
 				}
 				if options.onlyPass != nil && *options.onlyPass && !s.IsPassed {
 					continue
-				}
-
-				if s.IsPassed {
-					isPassed = textpkg.FgGreen.Sprintf("✓ pass")
-				} else {
-					isPassed = textpkg.FgRed.Sprintf("× fail")
 				}
 
 				if s.ElapsedTime == 0 {
@@ -112,24 +156,22 @@ func Render(sum *parserpkg.Summary, opts ...RenderOptionFunc) {
 				if len(out) > 0 && out[len(out)-1] == '\n' {
 					out = out[:len(out)-1]
 				}
-				out, _ = extractError(out)
+				out, _ = extractErrorOrPanic(out)
 
 				var tName = s.TestName
 				if s.IsPassed {
-					tName = textpkg.FgGreen.Sprintf(tName)
+					tName = color(tName, textpkg.FgGreen, options.ReportColors())
 					out = ""
 				} else {
-					tName = textpkg.FgRed.Sprintf(tName)
+					tName = color(tName, textpkg.FgRed, options.ReportColors())
 				}
 
 				// Добавим отступ к имени Subtest для его выделения
 				isLast := s == test.Subtests[len(test.Subtests)-1]
-				var symbol = " ├─ "
-				if isLast {
-					symbol = " ╰─ "
-				}
+				var symbol = getSymbol(isLast, options.ReportColors())
+
 				t.AppendRows([]tablepkg.Row{
-					{symbol + tName, isPassed, elapsedTime, out},
+					{symbol + tName, getIsPassedStr(s.IsPassed, options.ReportColors()), elapsedTime, out},
 				})
 			}
 			t.AppendSeparator()
@@ -138,10 +180,10 @@ func Render(sum *parserpkg.Summary, opts ...RenderOptionFunc) {
 	t.SetStyle(tablepkg.StyleLight)
 
 	t.SetAutoIndex(true)
-	t.Render()
+	return t
 }
 
-func extractError(text string) (string, error) {
+func extractErrorOrPanic(text string) (string, error) {
 	re := regexp.MustCompile(`Error:(?s)(.*?)(\n\s*Test:)`)
 	matches := re.FindStringSubmatch(text)
 	if len(matches) > 1 {
@@ -149,5 +191,22 @@ func extractError(text string) (string, error) {
 		errorText = strings.ReplaceAll(errorText, "\t", " ")
 		return strings.TrimSpace(errorText), nil
 	}
-	return "", fmt.Errorf("error block not found")
+
+	rePanic := regexp.MustCompile(`panic:(?s)(.*?)(\n\sgoroutine)`)
+	matchesPanic := rePanic.FindStringSubmatch(text)
+	if len(matchesPanic) > 1 {
+		panicText := matchesPanic[1]
+		panicText = strings.ReplaceAll(panicText, "\t", " ")
+		return strings.TrimSpace(panicText), nil
+	}
+
+	reLog := regexp.MustCompile(`(?m)^\s*---\sLOG:(.*)$`)
+	matchesLog := reLog.FindStringSubmatch(text)
+	if len(matchesLog) > 1 {
+		logText := matchesLog[1]
+		logText = strings.ReplaceAll(logText, "\t", " ")
+		return strings.TrimSpace(logText), nil
+	}
+
+	return "", fmt.Errorf("error or panic block not found")
 }

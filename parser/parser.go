@@ -61,6 +61,8 @@ func (p *parser) Parse(actionStr string) {
 			StartTime: action.Time,
 			IsPassed:  true,
 		}
+		p.sum.TotalPassed++
+		p.sum.TotalPackages++
 
 		if parentTestName == "" {
 			p.currentPackage.TestResults[action.Test] = p.currentTest
@@ -81,7 +83,6 @@ func (p *parser) Parse(actionStr string) {
 		p.currentTest.EndTime = action.Time
 		p.currentTest.ElapsedTime = action.Elapsed
 		p.currentTest.IsPassed = checkSubtestsPassed(p.currentTest)
-		p.sum.TotalPackages++
 
 		if v, ok := p.currentPackage.TestResults[action.Test]; ok {
 			v.IsPassed = p.currentTest.IsPassed
@@ -96,6 +97,7 @@ func (p *parser) Parse(actionStr string) {
 		p.currentTest.ElapsedTime = action.Elapsed
 		p.currentTest.IsPassed = false
 		p.sum.TotalFailed++
+		p.sum.TotalPassed--
 
 		if p.currentPackage.PackageName == action.Package {
 			p.currentPackage.IsPassed = false
@@ -117,7 +119,6 @@ func (p *parser) Parse(actionStr string) {
 		}
 
 		p.sum.PackageResults = append(p.sum.PackageResults, *p.currentPackage)
-		p.sum.TotalPackages++
 	}
 }
 

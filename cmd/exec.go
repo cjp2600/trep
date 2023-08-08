@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 
 	parserpkg "github.com/cjp2600/trep/parser"
+	reportpkg "github.com/cjp2600/trep/report"
 )
 
 var ExecCmd = &cobra.Command{
@@ -24,9 +25,13 @@ var ExecCmd = &cobra.Command{
 }
 
 var onlyFail bool
+var report bool
+var reportPath string
 
 func init() {
-	ExecCmd.Flags().BoolVar(&onlyFail, "onlyFail", false, "Only display failed tests")
+	ExecCmd.Flags().BoolVarP(&onlyFail, "only-fail", "f", false, "Only display failed tests")
+	ExecCmd.Flags().BoolVarP(&report, "report", "r", false, "Generate a report")
+	ExecCmd.Flags().StringVarP(&reportPath, "report-path", "p", "./", "Path to save the report (default is current directory)")
 }
 
 type Exec struct {
@@ -129,22 +134,32 @@ func runCommand(name string, args ...string) error {
 
 	sum := ex.parser.GetSummary()
 	{
+		var opts []tui.RenderOptionFunc
 		if onlyFail {
 			if sum.TotalFailed > 0 {
-				tui.Render(sum, tui.WithOnlyFail())
+				opts = append(opts, tui.WithOnlyFail())
 			} else {
 				fmt.Println(textpkg.FgGreen.Sprint("All tests passed!"))
+				fmt.Println(textpkg.FgGreen.Sprint(sum.TotalPackages, " tests total, ", sum.TotalPassed, " tests passed, ", sum.TotalFailed, " tests failed"))
 				return nil
 			}
-		} else {
-			tui.Render(sum)
+		}
+
+		tui.BuildTable(sum, opts...).Render()
+	}
+
+	if report {
+		if err = reportpkg.GenerateAndSaveReport(sum, reportPath); err != nil {
+			return fmt.Errorf("error save report output: %w", err)
 		}
 	}
 
 	if err = cmd.Wait(); err != nil {
+		fmt.Println(textpkg.FgRed.Sprint(sum.TotalPackages, " tests total, ", sum.TotalPassed, " tests passed, ", sum.TotalFailed, " tests failed"))
 		return fmt.Errorf("tests failed: %w", err)
 	}
 
+	fmt.Println(textpkg.FgGreen.Sprint(sum.TotalPackages, " tests total, ", sum.TotalPassed, " tests passed, ", sum.TotalFailed, " tests failed"))
 	fmt.Println(textpkg.FgGreen.Sprint("All tests passed!"))
 	return nil
 }
