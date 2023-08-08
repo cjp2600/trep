@@ -27,11 +27,13 @@ var ExecCmd = &cobra.Command{
 var onlyFail bool
 var report bool
 var reportPath string
+var mode string
 
 func init() {
 	ExecCmd.Flags().BoolVarP(&onlyFail, "only-fail", "f", false, "Only display failed tests")
 	ExecCmd.Flags().BoolVarP(&report, "report", "r", false, "Generate a report")
 	ExecCmd.Flags().StringVarP(&reportPath, "report-path", "p", "./", "Path to save the report (default is current directory)")
+	ExecCmd.Flags().StringVarP(&mode, "mode", "m", "cli", "run mode (e.g. 'cli', 'ci')")
 }
 
 type Exec struct {
@@ -110,6 +112,11 @@ func runCommand(name string, args ...string) error {
 
 	stopCh := make(chan bool)
 	go func() {
+		if mode == "ci" {
+			fmt.Printf("Running tests in CI mode...\n")
+			return
+		}
+
 		loaderChars := `-\|/`
 		i := 0
 		for {
