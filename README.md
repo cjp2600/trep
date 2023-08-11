@@ -12,6 +12,12 @@ In addition to facilitating local development, TRAP shines in a CI/CD pipeline. 
 
 In essence, TRAP embodies the philosophy that effective communication and understanding between all team members - technical or not - is essential to the successful delivery of a software project. By making test results more accessible and actionable, TRAP helps to bridge the gap between developers, managers, and QA specialists, fostering a more collaborative and productive team environment.
 
+## Installation
+
+```shell
+go install github.com/cjp2600/trep@latest
+```
+
 ## `exec` Command
 
 ### Description
