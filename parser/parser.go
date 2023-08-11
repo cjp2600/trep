@@ -1,13 +1,12 @@
 package parser
 
 import (
-	"encoding/json"
 	"strings"
 	"time"
 )
 
 type Parser interface {
-	Parse(line string)
+	Parse(action *Action)
 	GetSummary() *Summary
 }
 
@@ -27,10 +26,9 @@ func NewParser() Parser {
 	}
 }
 
-func (p *parser) Parse(actionStr string) {
-	var action Action
-	err := json.Unmarshal([]byte(actionStr), &action)
-	if err != nil {
+// Parse parses the action and updates the summary
+func (p *parser) Parse(action *Action) {
+	if action == nil {
 		return
 	}
 
@@ -46,6 +44,7 @@ func (p *parser) Parse(actionStr string) {
 			p.currentPackage.Output = append(p.currentPackage.Output, action.Output)
 			return
 		}
+
 		p.currentTest.Output = append(p.currentTest.Output, action.Output)
 
 	case "run":
@@ -88,6 +87,10 @@ func (p *parser) Parse(actionStr string) {
 			v.IsPassed = p.currentTest.IsPassed
 		}
 	case "skip":
+		p.currentPackage = &PackageResult{
+			TestResults: make(map[string]*TestResult), // Initialize the map
+		}
+		p.currentTest = &TestResult{}
 		return
 
 	case "fail":
@@ -121,6 +124,9 @@ func (p *parser) Parse(actionStr string) {
 		}
 
 		p.sum.PackageResults = append(p.sum.PackageResults, *p.currentPackage)
+		p.currentPackage = &PackageResult{
+			TestResults: make(map[string]*TestResult), // Initialize the map
+		}
 	}
 }
 
@@ -155,6 +161,12 @@ func findTest(testName string, testResults map[string]*TestResult) *TestResult {
 				return foundTest
 			}
 		}
+	}
+
+	if strings.Contains(testName, "/") {
+		testNames := strings.Split(testName, "/")
+		testName = testNames[len(testNames)-1]
+		return findTest(testName, testResults)
 	}
 
 	return nil

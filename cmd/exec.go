@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 	"time"
 
@@ -49,6 +50,7 @@ func NewExec() *Exec {
 	}
 }
 
+// parseArguments parses the given arguments and returns them as a slice
 func parseArguments(inputArgs []string) []string {
 	if len(inputArgs) == 0 {
 		return inputArgs
@@ -63,6 +65,7 @@ func parseArguments(inputArgs []string) []string {
 	return inputArgs
 }
 
+// checkAndAddJSONFlag checks if the given args contain the -json flag and adds it if not
 func checkAndAddJSONFlag(args []string) []string {
 	for _, arg := range args {
 		if arg == "-json" {
@@ -73,6 +76,7 @@ func checkAndAddJSONFlag(args []string) []string {
 	return append(args, "-json")
 }
 
+// executeCommand executes the given command and formats its output
 func executeCommand(cmd *cobra.Command, args []string) {
 	parsedArgs := parseArguments(args)
 	parsedArgsWithJSONFlag := checkAndAddJSONFlag(parsedArgs)
@@ -91,10 +95,7 @@ func executeCommand(cmd *cobra.Command, args []string) {
 	os.Exit(0)
 }
 
-func (e *Exec) parseLine(line string) {
-	e.parser.Parse(line)
-}
-
+// collectNonJSONLines collects non JSON lines and returns them as a string
 func collectNonJSONLines(line string, nonJSONLines *[]string) bool {
 	if !isJSON(line) {
 		*nonJSONLines = append(*nonJSONLines, line)
@@ -103,6 +104,7 @@ func collectNonJSONLines(line string, nonJSONLines *[]string) bool {
 	return false
 }
 
+// checkBuildFailure checks if there are any build failures
 func checkBuildFailure(line string) error {
 	if strings.HasPrefix(line, "FAIL") && strings.Contains(line, "[build failed]") {
 		return fmt.Errorf("error: there are build issues. please check the logs and source code")
@@ -111,11 +113,55 @@ func checkBuildFailure(line string) error {
 	return nil
 }
 
+// isJSON checks if the given string is a valid JSON
 func isJSON(str string) bool {
 	var js json.RawMessage
 	return json.Unmarshal([]byte(str), &js) == nil
 }
 
+// groupActionHandler groups actions by package and executes the handler function
+func groupActionHandler(actions []*parserpkg.Action, handler func(action *parserpkg.Action)) {
+	sort.Slice(actions, func(i, j int) bool {
+		return actions[i].Time.Before(actions[j].Time)
+	})
+
+	var groupActions = make(map[string][]*parserpkg.Action)
+	for _, action := range actions {
+		groupActions[action.Package] = append(groupActions[action.Package], action)
+	}
+
+	for k, actionsList := range groupActions {
+		for _, action := range actionsList {
+			if action.Action == "skip" {
+				delete(groupActions, k)
+			}
+		}
+	}
+
+	if len(groupActions) > 0 {
+		for _, actionsList := range groupActions {
+			for _, action := range actionsList {
+				handler(action)
+			}
+		}
+	}
+}
+
+// printAction prints the given action
+func parseAction(actionStr string) (*parserpkg.Action, error) {
+	if isJSON(actionStr) {
+		var action parserpkg.Action
+		err := json.Unmarshal([]byte(actionStr), &action)
+		if err != nil {
+			return nil, fmt.Errorf("error unmarshalling action: %w", err)
+		}
+		return &action, nil
+	}
+
+	return nil, fmt.Errorf("error parsing action: %s", actionStr)
+}
+
+// runCommand runs the given command and formats its output
 func runCommand(name string, args ...string) error {
 	ex := NewExec()
 
@@ -139,6 +185,7 @@ func runCommand(name string, args ...string) error {
 		loader(stopCh)
 	}
 
+	var actions []*parserpkg.Action
 	var buildFailureErr error
 	nonJSONLines := []string{}
 	for scanner.Scan() {
@@ -149,7 +196,11 @@ func runCommand(name string, args ...string) error {
 			}
 		}
 
-		ex.parser.Parse(line)
+		action, err := parseAction(line)
+		if err != nil {
+			continue
+		}
+		actions = append(actions, action)
 	}
 
 	if buildFailureErr != nil {
@@ -159,6 +210,11 @@ func runCommand(name string, args ...string) error {
 
 	// Stop the loader
 	stopCh <- true
+
+	// group actions by package
+	groupActionHandler(actions, func(action *parserpkg.Action) {
+		ex.parser.Parse(action)
+	})
 
 	sum := ex.parser.GetSummary()
 	{
