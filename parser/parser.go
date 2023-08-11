@@ -87,6 +87,8 @@ func (p *parser) Parse(actionStr string) {
 		if v, ok := p.currentPackage.TestResults[action.Test]; ok {
 			v.IsPassed = p.currentTest.IsPassed
 		}
+	case "skip":
+		return
 
 	case "fail":
 		if action.Test == "" {

@@ -13,9 +13,6 @@ func TestExample(t *testing.T) {
 		{
 			name: "pass test",
 		},
-		{
-			name: "fail test",
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

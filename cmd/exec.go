@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -94,6 +95,27 @@ func (e *Exec) parseLine(line string) {
 	e.parser.Parse(line)
 }
 
+func collectNonJSONLines(line string, nonJSONLines *[]string) bool {
+	if !isJSON(line) {
+		*nonJSONLines = append(*nonJSONLines, line)
+		return true
+	}
+	return false
+}
+
+func checkBuildFailure(line string) error {
+	if strings.HasPrefix(line, "FAIL") && strings.Contains(line, "[build failed]") {
+		return fmt.Errorf("error: there are build issues. please check the logs and source code")
+	}
+
+	return nil
+}
+
+func isJSON(str string) bool {
+	var js json.RawMessage
+	return json.Unmarshal([]byte(str), &js) == nil
+}
+
 func runCommand(name string, args ...string) error {
 	ex := NewExec()
 
@@ -117,8 +139,22 @@ func runCommand(name string, args ...string) error {
 		loader(stopCh)
 	}
 
+	var buildFailureErr error
+	nonJSONLines := []string{}
 	for scanner.Scan() {
-		ex.parser.Parse(scanner.Text())
+		line := scanner.Text()
+		if collectNonJSONLines(line, &nonJSONLines) {
+			if err = checkBuildFailure(line); err != nil {
+				buildFailureErr = err
+			}
+		}
+
+		ex.parser.Parse(line)
+	}
+
+	if buildFailureErr != nil {
+		stopCh <- true
+		return fmt.Errorf("%w:\n\n %s", buildFailureErr, strings.Join(nonJSONLines, "\n"))
 	}
 
 	// Stop the loader
@@ -168,7 +204,7 @@ func runCommand(name string, args ...string) error {
 // loader displays a loader while the tests are running
 func loader(stopCh chan bool) {
 	go func() {
-		if mode == "ci" {
+		if mode == CIMode {
 			fmt.Printf("Running tests...")
 			for {
 				select {
@@ -193,3 +229,7 @@ func loader(stopCh chan bool) {
 		}
 	}()
 }
+
+const (
+	CIMode = "ci"
+)

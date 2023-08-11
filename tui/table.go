@@ -215,5 +215,13 @@ func extractErrorOrPanic(text string) (string, error) {
 		return strings.TrimSpace(logText), nil
 	}
 
-	return "", fmt.Errorf("error or panic block not found")
+	reBuildFailed := regexp.MustCompile(`FAIL\s*[^\s]+ \[build failed\](.*)`)
+	matchesBuildFailed := reBuildFailed.FindStringSubmatch(text)
+	if len(matchesBuildFailed) > 0 {
+		buildFailedText := matchesBuildFailed[0]
+		buildFailedText = strings.ReplaceAll(buildFailedText, "\t", " ")
+		return strings.TrimSpace(buildFailedText), nil
+	}
+
+	return text, nil
 }
