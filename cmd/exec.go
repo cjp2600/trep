@@ -66,27 +66,34 @@ func parseArguments(inputArgs []string) []string {
 }
 
 // checkAndAddJSONFlag checks if the given args contain the -json flag and adds it if not
-func checkAndAddJSONFlag(args []string) []string {
-	for _, arg := range args {
-		if arg == "-json" {
-			return args
+func checkAndAddFlags(args []string, flags ...string) []string {
+	for _, flag := range flags {
+		found := false
+		for _, arg := range args {
+			if arg == flag {
+				found = true
+				break
+			}
+		}
+		if !found {
+			args = append(args, flag)
 		}
 	}
 
-	return append(args, "-json")
+	return args
 }
 
 // executeCommand executes the given command and formats its output
 func executeCommand(cmd *cobra.Command, args []string) {
 	parsedArgs := parseArguments(args)
-	parsedArgsWithJSONFlag := checkAndAddJSONFlag(parsedArgs)
-	if !strings.Contains(strings.Join(parsedArgsWithJSONFlag, " "), "go test") {
+	parsedArgsWithRequiredFlag := checkAndAddFlags(parsedArgs, "-json", "-v", "-cover")
+	if !strings.Contains(strings.Join(parsedArgsWithRequiredFlag, " "), "go test") {
 		fmt.Println(textpkg.FgRed.Sprintf("Error: exec command only supports go test commands"))
 		os.Exit(1)
 		return
 	}
 
-	if err := runCommand(parsedArgsWithJSONFlag[0], parsedArgsWithJSONFlag[1:]...); err != nil {
+	if err := runCommand(parsedArgsWithRequiredFlag[0], parsedArgsWithRequiredFlag[1:]...); err != nil {
 		fmt.Println(textpkg.FgRed.Sprintf(err.Error()))
 		os.Exit(1)
 		return

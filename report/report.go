@@ -27,6 +27,7 @@ func GenerateAndSaveReport(sum *parserpkg.Summary, reportPath string, reportName
 	return saveReport(html, reportPath, reportName, sum)
 }
 
+// getFailedTests returns a list of failed tests
 func getFailedTests(sum *parserpkg.Summary) []string {
 	var failedTests []string
 	for _, pkg := range sum.PackageResults {
@@ -131,6 +132,7 @@ func captureStdout(f func()) (string, error) {
 	return output, nil
 }
 
+// stripHTML strips the given HTML string of all HTML tags
 func stripHTML(input string) string {
 	doc, err := htmlpkg.Parse(strings.NewReader(input))
 	if err != nil {
@@ -152,6 +154,7 @@ func stripHTML(input string) string {
 	return textContent
 }
 
+// insertRowIDs inserts row IDs into the given HTML table
 func insertRowIDs(htmlTable string) string {
 	doc, err := htmlpkg.Parse(strings.NewReader(htmlTable))
 	if err != nil {
