@@ -33,11 +33,11 @@ var mode string
 var reportName string
 
 func init() {
+	ExecCmd.Flags().StringVarP(&reportName, "report-name", "n", "", "Custom report name Example: report")
 	ExecCmd.Flags().BoolVarP(&onlyFail, "only-fail", "f", false, "Only display failed tests")
 	ExecCmd.Flags().BoolVarP(&report, "report", "r", false, "Generate a report")
 	ExecCmd.Flags().StringVarP(&reportPath, "report-path", "p", "./", "Path to save the report (default is current directory)")
 	ExecCmd.Flags().StringVarP(&mode, "mode", "m", "cli", "Run mode (e.g. 'cli', 'ci')")
-	ExecCmd.Flags().StringVarP(&reportName, "report-name", "n", "", "Custom report name Example: report") // Новый флаг
 }
 
 type Exec struct {
@@ -86,7 +86,7 @@ func checkAndAddFlags(args []string, flags ...string) []string {
 // executeCommand executes the given command and formats its output
 func executeCommand(cmd *cobra.Command, args []string) {
 	parsedArgs := parseArguments(args)
-	parsedArgsWithRequiredFlag := checkAndAddFlags(parsedArgs, "-json", "-v", "-cover")
+	parsedArgsWithRequiredFlag := checkAndAddFlags(parsedArgs, "--json", "-v", "--cover")
 	if !strings.Contains(strings.Join(parsedArgsWithRequiredFlag, " "), "go test") {
 		fmt.Println(textpkg.FgRed.Sprintf("Error: exec command only supports go test commands"))
 		os.Exit(1)
